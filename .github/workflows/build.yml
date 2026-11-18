@@ -47,6 +47,7 @@ jobs:
           npm i @capacitor/core@8 \
             @capacitor/cli@8 \
             @capacitor/android@8 \
+            @capacitor/assets \
             @anuradev/capacitor-background-mode@8
           mkdir www
           echo '<!doctype html><title>Alex Music</title>' > www/index.html
@@ -55,6 +56,13 @@ jobs:
           EOF2
           npx cap add android
           npx cap sync android
+          if [ -f ../icon.png ]; then
+            mkdir assets
+            node -e "const s=require('sharp');s('../icon.png').resize(1024,1024,{fit:'cover'}).toFile('assets/icon-only.png').then(()=>s('../icon.png').resize(740,740,{fit:'cover'}).extend({top:142,bottom:142,left:142,right:142,background:{r:18,g:18,b:18,alpha:1}}).toFile('assets/icon-foreground.png'))"
+            npx capacitor-assets generate --android \
+              --iconBackgroundColor '#121212' \
+              --iconBackgroundColorDark '#121212'
+          fi
           M=android/app/src/main/AndroidManifest.xml
           for P in POST_NOTIFICATIONS FOREGROUND_SERVICE \
             FOREGROUND_SERVICE_SPECIAL_USE WAKE_LOCK \
