@@ -655,8 +655,13 @@ audio.addEventListener('error',()=>{
    MODE LATAR BELAKANG (hanya aktif di APK Capacitor)
 ============================================================ */
 const BGM={on:false,asked:false,
-  isApp(){try{const C=window.Capacitor;return !!(C&&(C.isNativePlatform?C.isNativePlatform():C.getPlatform&&C.getPlatform()!=='web'))}catch(_){return false}},
-  call(m,o){try{const C=window.Capacitor;if(!C)return Promise.resolve();const P=C.Plugins&&C.Plugins.BackgroundMode;if(P&&typeof P[m]==='function')return Promise.resolve(P[m](o||{}));if(C.nativePromise)return Promise.resolve(C.nativePromise('BackgroundMode',m,o||{}))}catch(_){}return Promise.resolve()},
+  isApp(){try{const C=window.Capacitor;if(window.androidBridge)return true;return !!(C&&(C.isNativePlatform?C.isNativePlatform():C.getPlatform&&C.getPlatform()!=='web'))}catch(_){return false}},
+  callE(m,o){const C=window.Capacitor;if(!C)return Promise.reject(new Error('Capacitor tidak ada'));
+    const P=C.Plugins&&C.Plugins.BackgroundMode;
+    if(P&&typeof P[m]==='function')return Promise.resolve(P[m](o||{}));
+    if(C.nativePromise)return Promise.resolve(C.nativePromise('BackgroundMode',m,o||{}));
+    return Promise.reject(new Error('plugin tidak ditemukan'))},
+  call(m,o){try{return this.callE(m,o).catch(()=>{})}catch(_){return Promise.resolve()}},
   cfg(){const t=S.cur;return {title:t?t.title:'Alex Music',text:t?t.artist:'Memutar musik',subText:'Alex Music',resume:true,silent:false,hidden:false,channelName:'Pemutar musik',channelDescription:'Menjaga musik tetap berputar saat layar mati',allowClose:true,closeTitle:'Tutup',disableWebViewOptimization:true,visibility:'public'}},
   async start(){
     if(!this.isApp())return;
@@ -1236,6 +1241,8 @@ function openSettings(){
   <div class="shIn"><input id="keyIn" placeholder="YouTube API key (AIza…)" value="${esc(S.ytKey)}"><button data-act="saveKey">Simpan</button></div>
   <div class="note">Buka file ini lewat link hosting (mis. Netlify Drop), bukan dari file lokal, supaya YouTube mau memutar.</div>
   ${BGM.isApp()?`<button class="shItem" data-act="battery">${IC.gear}<span>Izinkan jalan di latar belakang (hemat baterai)</span></button>`:''}
+  <button class="shItem" data-act="bgdiag">${IC.gear}<span>Cek mode latar belakang</span></button>
+  <div class="note" id="bgOut" style="white-space:pre-line"></div>
   <button class="shItem" data-act="testYt">${IC.search}<span>Tes API key YouTube</span></button>
   <div class="note" id="testOut"></div>
   <button class="shItem" data-act="testAud">${IC.search}<span>Tes koneksi Audius</span></button>
@@ -1331,6 +1338,23 @@ const H={
   },
   permLater(){try{store.set('sba_perm1',1)}catch(_){}closeSheet()},
   battery(){BGM.call('requestDisableBatteryOptimizations').then(()=>toast('Pengaturan baterai dibuka'))},
+  async bgdiag(){
+    const o=$('#bgOut');o.textContent='Memeriksa…';
+    const C=window.Capacitor,L=[];
+    L.push('Capacitor: '+(C?'ada':'TIDAK ada'));
+    L.push('Mode app: '+(BGM.isApp()?'ya':'TIDAK (terdeteksi sebagai website)'));
+    if(C){
+      try{L.push('Platform: '+(C.getPlatform?C.getPlatform():'?'))}catch(_){}
+      try{L.push('Plugin terdaftar: '+(C.isPluginAvailable?(C.isPluginAvailable('BackgroundMode')?'ya':'TIDAK'):'?'))}catch(_){}
+    }
+    const step=async(label,m,arg)=>{try{await BGM.callE(m,arg);L.push(label+': OK')}catch(e){L.push(label+': GAGAL ('+((e&&(e.message||e.errorMessage))||e)+')')}o.textContent=L.join('\n')};
+    if(C){
+      await step('Izin notifikasi','requestNotificationsPermission');
+      await step('Nyalakan layanan','enable',BGM.cfg());
+      await step('Matikan optimasi WebView','disableWebViewOptimizations');
+    }
+    o.textContent=L.join('\n');
+  },
   async testYt(){
     const o=$('#testOut');o.textContent='Menguji…';
     const j=await fj(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=tulus+monokrom&key=${enc(S.ytKey)}`);
