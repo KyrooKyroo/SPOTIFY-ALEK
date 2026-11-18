@@ -55,6 +55,17 @@ jobs:
           EOF2
           npx cap add android
           npx cap sync android
+          M=android/app/src/main/AndroidManifest.xml
+          for P in POST_NOTIFICATIONS FOREGROUND_SERVICE \
+            FOREGROUND_SERVICE_SPECIAL_USE WAKE_LOCK \
+            REQUEST_IGNORE_BATTERY_OPTIMIZATIONS; do
+            grep -q "permission.$P\"" $M || sed -i \
+              "s#</manifest>#    <uses-permission android:name=\"android.permission.$P\"/>\n</manifest>#" $M
+          done
+          echo "=== MANIFEST ==="
+          cat $M
+          echo "=== PLUGINS ==="
+          cat android/app/src/main/assets/capacitor.plugins.json
 
       - name: Build APK
         working-directory: app/android
