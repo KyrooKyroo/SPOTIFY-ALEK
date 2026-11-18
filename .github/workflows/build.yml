@@ -28,7 +28,13 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      - name: Terima lisensi Android
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          mkdir -p "$SDK/licenses"
+          printf '\n24333f8a63b6825ea9c5514f83c2829b004d1fee' > "$SDK/licenses/android-sdk-license"
+          printf '\n84831b9409646a918e30573bab4c9c91346d8abd' > "$SDK/licenses/android-sdk-preview-license"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
 
       - name: Buat project Android
         env:
@@ -65,4 +71,3 @@ jobs:
             --repo "$REPO" \
             --title "APK $RUN_NO" \
             --notes "Unduh alex-music.apk lalu pasang di HP."
-            
