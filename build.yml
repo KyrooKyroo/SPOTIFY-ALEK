@@ -1,0 +1,56 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "Link website kamu (https://....github.io/...)"
+        required: true
+        default: "https://kyrokyroooo.github.io/Spotify-by-alex/"
+      app_name:
+        description: "Nama aplikasi"
+        required: true
+        default: "Alex Music"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Buat project Android
+        env:
+          APP_URL: ${{ inputs.app_url }}
+          APP_NAME: ${{ inputs.app_name }}
+        run: |
+          mkdir app && cd app
+          npm init -y
+          npm i @capacitor/core@8 @capacitor/cli@8 @capacitor/android@8 @anuradev/capacitor-background-mode@8
+          mkdir www
+          echo '<!doctype html><title>Alex Music</title>' > www/index.html
+          node -e 'const fs=require("fs");fs.writeFileSync("capacitor.config.json",JSON.stringify({appId:"com.alex.music",appName:process.env.APP_NAME,webDir:"www",server:{url:process.env.APP_URL,cleartext:false,androidScheme:"https"},android:{allowMixedContent:false}},null,2))'
+          npx cap add android
+          npx cap sync android
+
+      - name: Build APK
+        working-directory: app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rilis APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/android/app/build/outputs/apk/debug/app-debug.apk alex-music.apk
+          gh release create "apk-${{ github.run_number }}" alex-music.apk --repo "${{ github.repository }}" --title "APK #${{ github.run_number }}" --notes "Unduh alex-music.apk lalu pasang di HP."
