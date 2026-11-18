@@ -553,7 +553,7 @@ function badStream(t){audCache[t.key]=0;store.set('sba_aud2',audCache);markAvail
 /* ============================================================
    YOUTUBE — audio penuh (embed resmi). Durasi iTunes dipakai untuk memilih versi asli.
 ============================================================ */
-let ytCache=store.get('sba_yt4',{}),lastYtErr='';
+let ytCache=store.get('sba_yt5',{}),lastYtErr='';
 function isoDur(s){const m=/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(s||'');return m?(+m[1]||0)*3600+(+m[2]||0)*60+(+m[3]||0):0}
 async function fj(u,ms=8000){const c=new AbortController();const to=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{signal:c.signal});if(!r.ok){lastYtErr='HTTP '+r.status;try{const j=await r.json();if(j&&j.error&&j.error.message)lastYtErr=j.error.message}catch(_){}return null}return await r.json()}catch(e){lastYtErr='koneksi gagal';return null}finally{clearTimeout(to)}}
 async function ytSearch(q){
@@ -572,8 +572,8 @@ function rankYt(items,t,loose){
   if(!wants)pool=pool.filter(c=>!YT_BAD.test(c.title)&&!/cover/i.test(c.channel));
   const tols=loose?[8,15,30,60]:[8,15,30];if(D){for(const tol of tols){const f=pool.filter(c=>Math.abs(c.duration-D)<=tol);if(f.length){pool=f;break}if(tol===tols[tols.length-1])pool=[]}}
   const sc=c=>{const ch=nrm(c.channel).replace(/_/g,''),ti=coreTitle(c.title);let s=0;
-    if(/topic$/i.test(c.channel))s+=6;if(ch.includes(ta)||ta.includes(ch))s+=5;if(ti.includes(tt))s+=3;
-    if(/official/i.test(c.title+c.channel))s+=2;if(/vevo/i.test(c.channel))s+=2;
+    if(/\s-\s*topic$/i.test(c.channel))s+=10;if(ch.includes(ta)||ta.includes(ch))s+=5;if(ti.includes(tt))s+=3;
+    if(/official/i.test(c.title+c.channel))s+=2;if(/vevo/i.test(c.channel))s+=1;if(/\baudio\b|lyric/i.test(c.title))s+=3;if(/official (music )?video|\bm\/?v\b|\bclip\b/i.test(c.title)&&!/audio|lyric/i.test(c.title))s-=3;
     s+=Math.min(3,Math.log10((c.views||1)+1)/3);return s};
   return pool.map(c=>({c,s:sc(c)})).filter(x=>x.s>=(loose?1:3)).sort((a,b)=>b.s-a.s).map(x=>x.c);
 }
@@ -582,12 +582,12 @@ async function resolveYt(t){
   lastYtErr='';
   const artist=String(t.artist).split(',')[0];
   const metaP=Promise.race([ensureMeta(t,true,true).catch(()=>{}),new Promise(r=>setTimeout(r,1800))]);
-  const [,items]=await Promise.all([metaP,ytSearch(`${artist} ${t.title}`)]);
+  const [,items]=await Promise.all([metaP,ytSearch(`${artist} - ${t.title} audio`)]);
   let ranked=rankYt(items,t);
   if(!ranked.length)ranked=rankYt(items,t,true);
   if(!ranked.length&&items.length&&!lastYtErr.startsWith('HTTP 4')){const i2=await ytSearch(`${artist} - ${t.title} official audio`);ranked=rankYt(i2,t);if(!ranked.length)ranked=rankYt(i2,t,true)}
   const ids=ranked.slice(0,5).map(x=>x.id);
-  if(ids.length){ytCache[t.key]=ids;store.set('sba_yt4',ytCache);ytThumb(t,ids[0])}
+  if(ids.length){ytCache[t.key]=ids;store.set('sba_yt5',ytCache);ytThumb(t,ids[0])}
   return ids;
 }
 let ytPlayer=null,ytReady=false,ytPending=null;
@@ -610,7 +610,7 @@ async function ytFail(code){
   const tk=S.token;
   const ids=ytCache[t.key]||[];t._ci=(t._ci||0)+1;
   if(t._ci<ids.length){loadVideo(ids[t._ci]);armWatch(tk);return}
-  if(!String(t.key).startsWith('yt_')){delete ytCache[t.key];store.set('sba_yt4',ytCache)}
+  if(!String(t.key).startsWith('yt_')){delete ytCache[t.key];store.set('sba_yt5',ytCache)}
   if(code===150||code===101||code===153)lastYtErr='embed ditolak YouTube (buka lewat link hosting, bukan file lokal)';
   const a=await resolveAudius(t);if(tk!==S.token)return;
   if(a){S.mode='audio';t._aud=a;t._try=0;audio.src=audioUrl(t,0);audio.play().catch(()=>{})}else{t._why='yt';noAudio(t)}
@@ -1329,7 +1329,7 @@ const H={
   },
   retryCur(){closeSheet();if(S.cur){delete audCache[S.cur.key];startAt(S.qi)}},
   skipNext(){closeSheet();S.fails=0;next(false)},
-  saveKey(){S.ytKey=($('#keyIn').value||'').trim();store.set('sba_ytkey2',S.ytKey);ytCache={};store.set('sba_yt4',{});closeSheet();toast('Key tersimpan')},
+  saveKey(){S.ytKey=($('#keyIn').value||'').trim();store.set('sba_ytkey2',S.ytKey);ytCache={};store.set('sba_yt5',{});closeSheet();toast('Key tersimpan')},
   async permAllow(){
     try{store.set('sba_perm1',1)}catch(_){}
     closeSheet();BGM.asked=true;
@@ -1360,7 +1360,7 @@ const H={
     const j=await fj(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&q=tulus+monokrom&key=${enc(S.ytKey)}`);
     o.textContent=j&&j.items?'Key YouTube OK ✓':'Gagal: '+(lastYtErr||'tidak diketahui');
   },
-  clearCache(){metaCache={};audCache={};ytCache={};store.set('sba_yt4',{});store.set('sba_meta4',{});store.set('sba_aud2',{});closeSheet();toast('Cache dihapus')},
+  clearCache(){metaCache={};audCache={};ytCache={};store.set('sba_yt5',{});store.set('sba_meta4',{});store.set('sba_aud2',{});closeSheet();toast('Cache dihapus')},
   pickFiles(){$('#fileIn').click()},
   sheetBg(el,e){if(e.target===el)closeSheet()}
 };
